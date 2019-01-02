@@ -3,14 +3,14 @@ Installs an Application from a specified media source by executing the setup ins
 This script could be used with the Windows Server GPO PowerShell Start up Script feature to install a specific application.
 
 ## Why do we need this? 
-With a need to install an exe (in particular Microsoft’s ATP – Advanced Threat Protection installer) at startup, only if the required version isn’t already installed; I ended up finding a script written by Dan Scott-Raynsford (https://dscottraynsford.wordpress.com/).
+With a need to install an exe (in particular Microsoft’s ATP – Advanced Threat Protection installer - https://docs.microsoft.com/en-us/azure-advanced-threat-protection/atp-silent-installation) silently at startup (only if the required version isn’t already installed); I ended up finding a script written by Dan Scott-Raynsford (https://dscottraynsford.wordpress.com/).
 
-It worked OK but wasn’t perfect for our needs due to 2 issues; 1 being the spaces in the installer exe filename and 2 the use of quotes in the arguments needed to be supplied in the install string. The spaces in the filename could easily be resolved by editing the filename but I needed to make the passing in of multiple peculiar arguments more straight-forward anyway so may as well make the script as robust as possible.
+It worked OK but wasn’t perfect for our needs due to 2 issues; 1 being the spaces in the installer exe filename and 2 the use of quotes in the arguments needed to be supplied in the install string. The spaces in the filename could easily be resolved by editing the filename but I needed to make the passing in of multiple peculiar arguments more straight-forward anyway so I may as well make the script as robust as possible.
 
 I modified Dan's script to allow for these requirements plus some extra features and more verbose logging.
 
 - Changed parameter InstallerParameters to accept a string list.
-- Changed method of calling the installer from "cmd.exe /c" to creating a System.Diagnostics.Process and passing in the installer path and parameters separately. This takes care of .exe filenames that may have spaces as well as mulitiple arguments where they must use quote characters.
+- Changed method of calling the installer from "cmd.exe /c" to creating a System.Diagnostics.Process and passing in the installer path and parameters separately. This takes care of .exe filenames that may have spaces as well as mulitiple arguments where they might contain quote characters.
 - Added more verbose logging and output.
 - Added parameter to allow checking for a RunOnce registry entry, and skip calling the installer if it exists.
 
