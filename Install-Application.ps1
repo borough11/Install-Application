@@ -116,7 +116,7 @@
     ::http://dscottraynsford.wordpress.com/
     ::VERSION 1.0 2015-06-30  Daniel Scott-Raynsford Incomplete Version
 #>
-
+[CmdletBinding(DefaultParametersetName='None')]
 param(
     [String]
     [Parameter(Position=1,Mandatory=$true)]
@@ -138,12 +138,12 @@ param(
     $RegistryKey='',
 
     [String]
-    [Parameter(ParameterSetName='RegExtra',Mandatory=$true)]
+    [Parameter(ParameterSetName='RegExtra',Mandatory=$True)]
     [ValidateNotNullOrEmpty()]
     $RegistryName='',
 
     [String]
-    [Parameter(ParameterSetName='RegExtra',Mandatory=$true)]
+    [Parameter(ParameterSetName='RegExtra',Mandatory=$True)]
     [ValidateNotNullOrEmpty()]
     $RegistryValue='',
 
