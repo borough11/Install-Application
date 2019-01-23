@@ -86,7 +86,7 @@
     first if it doesn't exist which forces a restart before continuine the ATP portion of the install so we
     don't want to call the .exe again. The ATP installer is a WiX based installer which uses the RunOnce key
     to make continuous installs after required restarts).
-  
+
   .EXAMPLE
     .\Install-Application.ps1 -InstallerPath 'C:\Windows\System32\msiexec.exe' -InstallerParameters '/i "C:\temp\name of msi installer.msi"','/quiet','/l*v "C:\temp\name of msi installer_msilog.log"' -LogPath 'C:\temp'
 
@@ -108,8 +108,11 @@
                                parameters of which some may contain quotes AND where installer .exe files
                                may contain spaces in their filename/path.
                         v1.1 - Added more verbose logging and output.
-             28/12/1028 v1.2 - Added parameter to allow checking for a RunOnce registry entry, and skip
+             28/12/2018 v1.2 - Added parameter to allow checking for a RunOnce registry entry, and skip
                                calling the installer if it exists.
+             23/01/2019 v1.2 - Added regex to handle using the .msi filename for the log filename if installing
+                               an msi.
+                        v1.2 - Added exit code reasons.
 
     Modified based on the original script written by
     ::Daniel Scott-Raynsford
@@ -158,13 +161,32 @@ Function Add-LogEntry ([String]$Path,[String]$Message) {
     If ( $Path -ne '' ) {
         Add-Content -Path $Path -Value "$(Get-Date): $Message"
     }
-} # Function Add-LogEntry
+}
 
 # If LogPath was specified set up a log filename to write to
 If (($LogPath -eq '') -or ($LogPath -eq $null)) {
     [String]$LogFile = ''
-} else {
-	[String]$LogFile = Join-Path -Path $LogPath -ChildPath "$($ENV:computername)_$([System.IO.Path]::GetFileNameWithoutExtension($InstallerPath)).txt"
+} Else {
+    $appNameForLogFile = $([System.IO.Path]::GetFileNameWithoutExtension($InstallerPath))
+    If ($InstallerPath -like "*msiexec.exe") {
+        $InstallerParameters | ForEach-Object {
+            # param for msi will be like: '/i "C:\temp\name of msi installer.msi"'
+            If ($_ -like "/i*") {
+                # regex
+                # ^ Begins matching from start of string.
+                # .*\\ Matches all the characters upto the last \ symbol.
+                # ([^.]*) Captures any character but not . zero or more times.
+                # ..* Matches all the remaining characters.
+                # use -Match to create the $Matches variable where the desired result will be in $Matches[1]
+                $pattern = '^.*\\([^.]*)..*$'
+                If ($_ -Match $pattern) {
+                    # found msi /i installer file so update $appNameForLogFile to that rather than using $InstallerPath without extension
+                    $appNameForLogFile = $Matches[1]
+                }
+            }
+        }
+    }
+    [String]$LogFile = Join-Path -Path $LogPath -ChildPath "$($ENV:computername)_$appNameForLogFile.txt"
 }
 
 Add-LogEntry -Path $LogFile -Message "--------------------------------"
@@ -259,8 +281,60 @@ If (!$Installed) {
 
     Switch ($ExitCode) {
         0 { Add-LogEntry -Path $LogFile -Message "Install using [$Command] completed successfully (exit code: $ExitCode)." }
-        1641 { Add-LogEntry -Path $LogFile -Message "Install using [$Command] completed successfully and computer is rebooting (exit code: $ExitCode)." }
-        1603 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Does user have permission?" }
+        1601 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The Windows Installer Service could not be accessed. This can occur if the Windows Installer is not correctly installed. Contact your support personnel for assistance.." }
+        1602 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. User cancelled installation." }
+        1603 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Fatal error during installation. Does user have permission?" }
+        1604 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Installation suspended, incomplete." }
+        1605 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This action is only valid for products that are currently installed." }
+        1606 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Feature ID not registered." }
+        1607 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Component ID not registered." }
+        1608 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Unknown property." }
+        1609 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Handle is in an invalid state." }
+        1610 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The configuration data for this product is corrupt. Contact your support personnel." }
+        1611 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Component qualifier not present." }
+        1612 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The installation source for this product is not available. Verify that the source exists and that you can access it." }
+        1613 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This installation package cannot be installed by the Windows Installer service. You must install a Windows service pack that contains a newer version of the Windows Installer service." }
+        1614 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Product is uninstalled." }
+        1615 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. SQL query syntax invalid or unsupported." }
+        1616 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Record field does not exist." }
+        1617 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The device has been removed." }
+        1618 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Another installation is already in progress. Complete that installation before proceeding with this install." }
+        1619 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This installation package could not be opened. Verify that the package exists and that you can access it, or contact the application vendor to verify that this is a valid Windows Installer package." }
+        1620 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This installation package could not be opened. Contact the application vendor to verify that this is a valid Windows Installer package." }
+        1621 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. There was an error starting the Windows Installer service user interface. Contact your support personnel." }
+        1622 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Error opening installation log file. Verify that the specified log file location exists and that you can write to it." }
+        1623 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The language of this installation package is not supported by your system." }
+        1624 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Error applying transforms. Verify that the specified transform paths are valid." }
+        1625 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This installation is forbidden by system policy. Contact your system administrator." }
+        1626 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Function could not be executed." }
+        1627 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Function failed during execution." }
+        1628 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Invalid or unknown table specified." }
+        1629 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Data supplied is of wrong type." }
+        1630 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Data of this type is not supported." }
+        1631 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The Windows Installer service failed to start. Contact your support personnel." }
+        1632 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The Temp folder is on a drive that is full or is inaccessible. Free up space on the drive or verify that you have write permission on the Temp folder." }
+        1633 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This installation package is not supported by this processor type. Contact your product vendor." }
+        1634 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Component not used on this computer." }
+        1635 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This update package could not be opened. Verify that the update package exists and that you can access it, or contact the application vendor to verify that this is a valid Windows Installer update package." }
+        1636 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This update package could not be opened. Contact the application vendor to verify that this is a valid Windows Installer update package." }
+        1637 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. This update package cannot be processed by the Windows Installer service. You must install a Windows service pack that contains a newer version of the Windows Installer service." }
+        1638 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Another version of this product is already installed. Installation of this version cannot continue. To configure or remove the existing version of this product, use Add/Remove Programs on the Control Panel." }
+        1639 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Invalid command line argument. Consult the Windows Installer SDK for detailed command line help." }
+        1640 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Only administrators have permission to add, remove, or configure server software during a Terminal services remote session. If you want to install or configure software on the server, contact your network administrator." }
+        1641 { Add-LogEntry -Path $LogFile -Message "Install using [$Command] ended with exit code $ExitCode. The requested operation completed successfully. The system will be restarted so the changes can take effect." }
+        1642 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The upgrade cannot be installed by the Windows Installer service because the program to be upgraded may be missing, or the upgrade may update a different version of the program. Verify that the program to be upgraded exists on your computer and that you have the correct upgrade." }
+        1643 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The update package is not permitted by software restriction policy." }
+        1644 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. One or more customizations are not permitted by software restriction policy." }
+        1645 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The Windows Installer does not permit installation from a Remote Desktop Connection." }
+        1646 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Uninstallation of the update package is not supported." }
+        1647 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The update is not applied to this product." }
+        1648 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. No valid sequence could be found for the set of updates." }
+        1649 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Update removal was disallowed by policy." }
+        1650 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The XML update data is invalid." }
+        1651 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. Windows Installer does not permit updating of managed advertised products. At least one feature of the product must be installed before applying the update." }
+        1652 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The Windows Installer service is not accessible in Safe Mode. Please try again when your computer is not in Safe Mode or you can use System Restore to return your machine to a previous good state." }
+        1653 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. A fail fast exception occurred. Exception handlers will not be invoked and the process will be terminated immediately." }
+        1654 { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode. The app that you are trying to run is not supported on this version of Windows." }
         default { Add-LogEntry -Path $LogFile -Message "FAILED? Install using [$Command] ended with exit code $ExitCode." }
     }
 } Else {
