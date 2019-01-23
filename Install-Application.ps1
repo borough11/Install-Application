@@ -186,7 +186,7 @@ If (($LogPath -eq '') -or ($LogPath -eq $null)) {
             }
         }
     }
-    [String]$LogFile = Join-Path -Path $LogPath -ChildPath "$($ENV:computername)_$appNameForLogFile.txt"
+    [String]$LogFile = Join-Path -Path $LogPath -ChildPath "$($ENV:computername)_$appNameForLogFile`_install.txt"
 }
 
 Add-LogEntry -Path $LogFile -Message "--------------------------------"
